@@ -1,10 +1,9 @@
-// 修改版 script.js，支持检索词条并显示其所有出处，避免短词命中长词
+// 修复词条无法匹配问题，移除词边界断言，保留词长优先逻辑
 
 let forbiddenWords = [];
 let wordSources = {};
 let isForbiddenWordsLoaded = false;
 
-// 加载词表并构建词条及其出处数组
 async function loadForbiddenWords() {
     try {
         const response = await fetch('词表.json');
@@ -22,7 +21,6 @@ async function loadForbiddenWords() {
             });
         }
 
-        // 按词长度降序排序，避免短词误命中长词的一部分
         forbiddenWords.sort((a, b) => b.length - a.length);
 
         isForbiddenWordsLoaded = true;
@@ -43,13 +41,32 @@ function checkForbiddenWords() {
     const textInput = document.getElementById('textInput').value;
     let resultHTML = escapeHtml(textInput);
     let detectedWords = new Set();
+    let matchedRanges = []; // 用于避免重复覆盖
 
     forbiddenWords.forEach(word => {
-        const regex = new RegExp(`(?<![\u4e00-\u9fa5A-Za-z0-9])${escapeRegExp(word)}(?![\u4e00-\u9fa5A-Za-z0-9])`, 'g');
-        if (regex.test(textInput)) {
-            detectedWords.add(word);
-            resultHTML = resultHTML.replace(regex, `<span class="highlight">${word}</span>`);
+        const regex = new RegExp(escapeRegExp(word), 'g');
+        let match;
+
+        while ((match = regex.exec(textInput)) !== null) {
+            const start = match.index;
+            const end = start + word.length;
+
+            // 检查是否与已匹配区域重叠，若无则添加
+            if (!matchedRanges.some(r => (start < r[1] && end > r[0]))) {
+                matchedRanges.push([start, end]);
+                detectedWords.add(word);
+            }
         }
+    });
+
+    // 排序防止嵌套错位（从后往前替换）
+    matchedRanges.sort((a, b) => b[0] - a[0]);
+    matchedRanges.forEach(([start, end]) => {
+        const original = escapeHtml(textInput.slice(start, end));
+        resultHTML =
+            resultHTML.slice(0, start) +
+            `<span class="highlight">${original}</span>` +
+            resultHTML.slice(end);
     });
 
     document.getElementById('result').innerHTML = resultHTML;
@@ -71,7 +88,7 @@ function displayDetectedWords(detectedWords) {
         });
         detectedWordsDiv.style.display = 'block';
         const defaultNote = detectedWordsDiv.querySelector('.note');
-        if (defaultNote) defaultNote.remove();
+        if (defaultNote && defaultNote.textContent.includes('提示')) defaultNote.remove();
     } else {
         detectedWordsDiv.style.display = 'block';
         const defaultNote = detectedWordsDiv.querySelector('.note');
