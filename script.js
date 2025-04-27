@@ -70,9 +70,6 @@ function displayDetectedWords(detectedWords) {
             wordList.appendChild(listItem);
         });
         detectedWordsDiv.style.display = 'block';
-        detectedWordsDiv.querySelector('.note').textContent = '提示：请避免使用以上检测到的词语。';
-    } else {
-        detectedWordsDiv.style.display = 'block';
         detectedWordsDiv.querySelector('.note').textContent = '未检测到词语。';
     }
 }
