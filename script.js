@@ -1,24 +1,29 @@
-// 修改版 script.js，支持检索词条并显示其出处
+// 修改版 script.js，支持检索词条并显示其所有出处，避免短词命中长词
 
 let forbiddenWords = [];
 let wordSources = {};
 let isForbiddenWordsLoaded = false;
 
-// 加载词表并构建词条及其出处
+// 加载词表并构建词条及其出处数组
 async function loadForbiddenWords() {
     try {
         const response = await fetch('词表.json');
         if (!response.ok) throw new Error(`HTTP错误！状态：${response.status}`);
 
         const data = await response.json();
-        if (Array.isArray(data.words)) {
-            // 简单词表（仅词条）
-            forbiddenWords = data.words;
-        } else if (Array.isArray(data) && typeof data[0] === 'object') {
-            // 包含出处信息的结构
-            forbiddenWords = data.map(item => item.word);
-            data.forEach(item => wordSources[item.word] = item.source);
+        if (Array.isArray(data)) {
+            data.forEach(item => {
+                const word = item.word;
+                forbiddenWords.push(word);
+                if (!wordSources[word]) {
+                    wordSources[word] = [];
+                }
+                wordSources[word].push(item.source);
+            });
         }
+
+        // 按词长度降序排序，避免短词误命中长词的一部分
+        forbiddenWords.sort((a, b) => b.length - a.length);
 
         isForbiddenWordsLoaded = true;
         document.getElementById('loadStatus').textContent = '词表加载成功';
@@ -40,7 +45,7 @@ function checkForbiddenWords() {
     let detectedWords = new Set();
 
     forbiddenWords.forEach(word => {
-        const regex = new RegExp(`${escapeRegExp(word)}`, 'gi');
+        const regex = new RegExp(`(?<![\u4e00-\u9fa5A-Za-z0-9])${escapeRegExp(word)}(?![\u4e00-\u9fa5A-Za-z0-9])`, 'g');
         if (regex.test(textInput)) {
             detectedWords.add(word);
             resultHTML = resultHTML.replace(regex, `<span class="highlight">${word}</span>`);
@@ -59,12 +64,13 @@ function displayDetectedWords(detectedWords) {
     if (detectedWords.size > 0) {
         detectedWords.forEach(word => {
             const listItem = document.createElement('li');
-            const source = wordSources[word] || '（无出处信息）';
-            listItem.innerHTML = `<strong>${word}</strong> —— ${source}`;
+            const sources = wordSources[word] || ['（无出处信息）'];
+            const sourceText = sources.map(src => `<div class="note">出处：${src}</div>`).join('');
+            listItem.innerHTML = `<strong>${word}</strong>${sourceText}`;
             wordList.appendChild(listItem);
         });
         detectedWordsDiv.style.display = 'block';
-        detectedWordsDiv.querySelector('.note').textContent = '提示：请避免使用以上检测到的词语，已列出处。';
+        detectedWordsDiv.querySelector('.note').textContent = '提示：请避免使用以上检测到的词语。';
     } else {
         detectedWordsDiv.style.display = 'block';
         detectedWordsDiv.querySelector('.note').textContent = '未检测到词语。';
