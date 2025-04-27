@@ -70,7 +70,12 @@ function displayDetectedWords(detectedWords) {
             wordList.appendChild(listItem);
         });
         detectedWordsDiv.style.display = 'block';
-        detectedWordsDiv.querySelector('.note').textContent = '未检测到词语。';
+        const defaultNote = detectedWordsDiv.querySelector('.note');
+        if (defaultNote) defaultNote.remove();
+    } else {
+        detectedWordsDiv.style.display = 'block';
+        const defaultNote = detectedWordsDiv.querySelector('.note');
+        if (defaultNote) defaultNote.textContent = '未检测到词语。';
     }
 }
 
